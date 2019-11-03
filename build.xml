@@ -1,0 +1,157 @@
+<?xml version="1.0"?>
+
+<project name="VIA Core" default="usage" basedir=".">
+
+	<target name="usage">
+		<echo message="Supported 'target' Options:" />
+		<echo message="  clean --> delete all previously compiled class and distribution files" />
+		<echo message="  compile --> compile all java source files" />
+		<echo message="  package --> prepare distribution viacore.jar" />
+	</target>
+
+	<target name="init" unless="current.dev.dir">
+		<tstamp />
+		<property file="build.properties" />
+		<property environment="path" />
+
+		<property name="env" value="Dev" />
+		<property name="properties.dir" value="${classes.dir}" />
+
+		<property name="current.dev.dir" value="${path.VIA_HOME}" />
+
+		<echo message="------------ ${project.name} ${project.version} ----------" />
+		<echo message="VIA_HOME : ${path.VIA_HOME}" />
+		<echo message="Current Environment : ${env}" />
+
+		<path id="compile-classpath">
+			<fileset dir="${jars.dir}" includes="**/*.jar" />
+		</path>
+	</target>
+
+	<target name="create-dirs" depends="init">
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${dist.dir}" />
+		<mkdir dir="${classes.dir}" />
+		<mkdir dir="${test.classes.dir}" />
+		<mkdir dir="${junit.report.dir}" />
+	</target>
+
+	<target name="clean" depends="init">
+		<delete includeEmptyDirs="true" quiet="true">
+			<fileset dir="${classes.dir}" />
+			<fileset dir="${dist.dir}" />
+			<fileset dir="${test.classes.dir}" />
+			<fileset dir="${release.dir}" />
+		</delete>
+	</target>
+
+	<target name="compile" depends="create-dirs">
+		<echo message="------------ Compiling java sources in /src ----------" />
+		<property name="date-pattern" value="MM/dd/yyyy kk:mm:ss" />
+
+		<tstamp>
+			<format property="class.tstamp" pattern="${date-pattern}" />
+		</tstamp>
+		<javac srcdir="${src.dir}"
+		       destdir="${classes.dir}"
+		       debug="on"
+		       deprecation="false"
+		       memoryMaximumSize="768m"
+		       source="1.8"
+		       target="1.8"
+		       fork="yes"
+			   includeAntRuntime="true">
+			<classpath refid="compile-classpath" />
+		</javac>
+	</target>
+
+	<target name="deploy" depends="init, deploy-lib, deploy-source" 
+			description="copy resources to /classes and runtime libs to /lib">
+
+	</target>
+
+	<target name="deploy-lib" depends="init, manifest" description="copy runtime libs to lib">
+		<copy todir="${public.html.dir}/lib" flatten="yes" overwrite="yes">
+			<fileset dir="${jars.dir}">
+				<include name="*"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="deploy-source" depends="init" description="copy resources">
+		<copy todir="${classes.dir}" overwrite="yes" filtering="true">
+			<fileset dir="${classes.dir}">
+				<include name="*"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="package" depends="compile, deploy,  manifest"
+			description="Prepare viacore.jar for env">
+		<echo message="Preparing distribution of viacore.jar for Environment" />
+
+		<condition property="properties.dir.exists">
+			<available file="${dist.dir}/properties" type="dir" />
+		</condition>
+
+		<mkdir dir="${dist.dir}/APP-INF" />
+
+		<delete file="${dist.dir}/viacore.jar" quiet="true" />
+
+		<echo message="Packing viacore.jar file from build/dist" />
+
+		<jar destfile="${dist.dir}/viacore.jar"
+		     defaultexcludes="true"
+		     manifest="${config.dir}/${manifest.file}">
+
+			<fileset dir="${dist.dir}" 
+					 includes="*.jar"/>
+
+			<fileset dir="${classes.dir}">
+				<include name="**" />
+			</fileset>
+			<fileset dir="${properties.dir}">
+				<include name="**" />
+			</fileset>
+		</jar>
+
+		<antcall target="package-jar" />
+
+		<delete dir="${dist.dir}/APP-INF" quiet="true" />
+	</target>
+
+	<target name="package-jar" if="properties.dir.exists" description="currently is to create jar from properties folder if the folder exists">
+		<echo message="Preparing distribution of properties-${env}.jar for Weblogic Environment" />
+
+		<delete dir="${dist.dir}/properties-${env}.jar" quiet="true" />
+
+		<jar destfile="${dist.dir}/properties-${env}.jar" manifest="${config.dir}/${manifest.file}">
+			<fileset dir="${dist.dir}/properties" />
+		</jar>
+	</target>
+
+	<target name="manifest" depends="init" unless="manifest.file"
+	        description="to create manifest.mf file to be used for META-INF in jar/war/ear distribution">
+
+		<property file="build.properties" />
+
+		<tstamp>
+			<format property="build.date" pattern="dd/MMM/yyyy hh:mm" />
+		</tstamp>
+
+		<echo message="Creating MANIFEST.MF for META-INF in JAR/WAR/EAR distribution in ${config.dir}/MANIFEST.MF" />
+
+		<manifest file="${config.dir}/MANIFEST.MF">
+			<attribute name="Java-Version" value="${ant.java.version}" />
+			<attribute name="Created-By" value="VSAHI Ltd" />
+			<attribute name="Created-Date" value="${build.date}" />
+			<attribute name="Implementation-Vendor" value="${com-impl}" />
+			<attribute name="Implementation-Title" value="${com-title}" />
+			<attribute name="Implementation-Version" value="${com-version}" />
+			<attribute name="Main-Class" value="${com-app}"/>
+		</manifest>
+
+		<property name="manifest.file" value="MANIFEST.MF" />
+	</target>
+
+</project>
